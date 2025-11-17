@@ -120,36 +120,24 @@ async function ocrChar(worker, path, index) {
 
 // ★ MAIN RUN
 (async () => {
-	const img = await loadImage("img/9201.png");
+	const img = await loadImage("img/9559.png");
 	const cleaned = cleanImage(img);
 
 	// save cleaned image
 	const out = fs.createWriteStream("clean.png");
 	await PImage.encodePNGToStream(cleaned, out);
 	// Divide into 4 characters
-	const charImages = divideImage(cleaned);
 
 	// Create and initialize worker once
 	const worker = await Tesseract.createWorker("eng");
 	await worker.loadLanguage("eng");
 	await worker.initialize("eng");
 	await worker.setParameters({
-		tessedit_char_whitelist: "0123456789"
+		tessedit_char_whitelist: "0123456789",
+		tessedit_pageseg_mode: 7 // Treat image as a single line
 	});
 
-	// Save each character image and perform OCR
-	let result = "";
-	for (let i = 0; i < charImages.length; i++) {
-		const charPath = `char_${i}.png`;
-		const charOut = fs.createWriteStream(charPath);
-		await PImage.encodePNGToStream(charImages[i], charOut);
-
-		const charText = await ocrChar(worker, charPath, i);
-		result += charText;
-	}
-
-	// Terminate worker after all OCR is done
+	const result = await worker.recognize("clean.png");
+	console.log(result.data.text);
 	await worker.terminate();
-
-	console.log("📌 完整 OCR 結果：", result);
 })();

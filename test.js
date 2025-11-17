@@ -13,7 +13,7 @@ async function ocr(buffer) {
 // const resp = await fetch(url);
 // const captchaImage = Buffer.from(await resp.arrayBuffer());
 
-const path = "test.png";
+const path = "clean copy.png";
 import fs from "fs/promises";
 const captchaImage = await fs.readFile(path);
 
