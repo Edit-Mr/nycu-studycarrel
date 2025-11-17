@@ -91,30 +91,65 @@ function cleanImage(img) {
 	return newImg;
 }
 
-// ★ Step 3：OCR
-async function ocr(path) {
-	console.log("開始 OCR...");
-	const { data } = await Tesseract.recognize(path, "eng", {
-		tessedit_char_whitelist: "0123456789",
-		psm: 7, // treat as a single text line
-		load_system_dawg: 0,
-		load_freq_dawg: 0
-	});
-	console.log("OCR 結果：", data.text.trim());
-	return data.text;
+// ★ Step 3: Divide image into 4 equal parts
+function divideImage(img) {
+	const w = img.width;
+	const h = img.height;
+	const charWidth = Math.floor(w / 4);
+	const chars = [];
+
+	for (let i = 0; i < 4; i++) {
+		const startX = i * charWidth;
+		const newImg = PImage.make(charWidth, h);
+		const ctx = newImg.getContext("2d");
+		const srcCtx = img.getContext("2d");
+		const charData = srcCtx.getImageData(startX, 0, charWidth, h);
+		ctx.putImageData(charData, 0, 0);
+		chars.push(newImg);
+	}
+
+	return chars;
+}
+
+// ★ Step 4：OCR single character
+async function ocrChar(worker, path, index) {
+	const result = await worker.recognize(path);
+	const text = result.data.text.trim();
+	return text;
 }
 
 // ★ MAIN RUN
 (async () => {
-	const img = await loadImage("captcha-train/images/0143.png");
+	const img = await loadImage("img/9201.png");
 	const cleaned = cleanImage(img);
 
 	// save cleaned image
 	const out = fs.createWriteStream("clean.png");
 	await PImage.encodePNGToStream(cleaned, out);
-	console.log("✔ 已輸出 clean.png");
+	// Divide into 4 characters
+	const charImages = divideImage(cleaned);
 
-	// OCR
-	const text = await ocr("clean.png");
-	console.log("📌 OCR 結果：", text);
+	// Create and initialize worker once
+	const worker = await Tesseract.createWorker("eng");
+	await worker.loadLanguage("eng");
+	await worker.initialize("eng");
+	await worker.setParameters({
+		tessedit_char_whitelist: "0123456789"
+	});
+
+	// Save each character image and perform OCR
+	let result = "";
+	for (let i = 0; i < charImages.length; i++) {
+		const charPath = `char_${i}.png`;
+		const charOut = fs.createWriteStream(charPath);
+		await PImage.encodePNGToStream(charImages[i], charOut);
+
+		const charText = await ocrChar(worker, charPath, i);
+		result += charText;
+	}
+
+	// Terminate worker after all OCR is done
+	await worker.terminate();
+
+	console.log("📌 完整 OCR 結果：", result);
 })();
