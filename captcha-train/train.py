@@ -7,8 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 
-
-# ----------- IMAGE PREPROCESSING (同你 JS 的版本) -----------
+# ----------- IMAGE PREPROCESSING -----------
 
 def clean_image(img):
     # 灰階

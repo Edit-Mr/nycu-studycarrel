@@ -30,4 +30,4 @@ def predict(path):
 
     return result
 
-print(predict("img/9559.png"))
+print(predict("img/7210.png"))

@@ -1,3 +1,5 @@
+.env
+
 # ----------------------
 # Node.js
 # ----------------------
@@ -32,16 +34,6 @@ uv.lock
 *.onnx.tmp
 *.onnx.pb
 *.ckpt
-
-# ----------------------
-# Captcha images
-# ----------------------
-# (如果你不想把訓練資料上傳，就 ignore img/)
-# 如果你想保留訓練資料，只 ignore 其他生成檔
-# captcha-train/img/
-
-# 如果你想只 ignore clean.png / processed files
-clean.png
 
 # ----------------------
 # OS / Editor Trash
