@@ -3,13 +3,7 @@ import { ocr } from "./ocr.js";
 
 let logging = false;
 
-const { username, password } = process.env;
-if (!username || !password) {
-	console.error("請在環境變數中設定 USERNAME 和 PASSWORD");
-	process.exit(1);
-}
-
-const login = async () => {
+const login = async credit => {
 	if (logging) return;
 	logging = true;
 	const browser = await puppeteer.launch({
@@ -47,14 +41,13 @@ const login = async () => {
 		const captcha_value = await ocr(captchaImage);
 		console.log("辨識結果:", captcha_value);
 		await page.evaluate(
-			(captchaValue, username, password) => {
-				document.querySelector("input#id_username").value = username;
-				document.querySelector("input#id_password").value = password;
+			(captchaValue, cred) => {
+				document.querySelector("input#id_username").value = cred.username;
+				document.querySelector("input#id_password").value = cred.password;
 				document.querySelector("#checkNum").value = captchaValue.trim();
 			},
 			captcha_value,
-			username,
-			password
+			credit
 		);
 		await page.click(".btn_primary");
 		try {
