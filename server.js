@@ -1,43 +1,51 @@
 import Fastify from "fastify";
 import path from "path";
 import Static from "@fastify/static";
+import { fileURLToPath } from "url";
 import login from "./login.js";
 
 const fastify = Fastify({ logger: true, level: "error" });
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+fastify.register(Static, {
+	root: path.join(__dirname, "public")
+});
+
 let code = {};
 let roomsData = null;
-let isLoggingIn = false; // Prevent multiple simultaneous login attempts
+let isLoggingIn = false;
 
-// Fetch and cache room data
-async function fetchRoomsData() {
-	if (roomsData) return roomsData;
+const credit = { username: process.env.USERNAME, password: process.env.PASSWORD };
+if (!credit.username || !credit.password) {
+	console.error("請在環境變數中設定 USERNAME 和 PASSWORD");
+	process.exit(1);
+}
 
+const fetchRoomsData = async () => {
+	if (roomsData) return;
 	try {
 		const response = await fetch("https://studycarrel.lib.nycu.edu.tw/pwaspace/configs/map.json");
-		roomsData = await response.json();
-		return roomsData;
+		let maps = await response.json();
+		maps = maps.MAPS || {};
+		roomsData = {};
+		const whitelist = ["201", "202", "203", "501", "D601", "D602", "C601", "C602", "C603", "C604"];
+		for (const floor in maps) {
+			const devices = maps[floor].devices || [];
+			for (const dev of devices) {
+				const name = dev.devicename;
+				if (whitelist.includes(name)) roomsData[name] = dev.deviceid;
+			}
+		}
+		return;
 	} catch (error) {
 		console.error("Failed to fetch rooms data:", error);
 		return null;
 	}
-}
+};
 
-// Get all device IDs from rooms data
-function getAllDeviceIds() {
-	if (!roomsData) return [];
-
-	const deviceIds = [];
-	for (const map of Object.values(roomsData.MAPS)) {
-		for (const device of map.devices) {
-			deviceIds.push(device.deviceid);
-		}
-	}
-	return deviceIds;
-}
-
-// Find deviceid by devicename
-function findDeviceIdByName(devicename) {
+const findDeviceIdByName = devicename => {
 	if (!roomsData) return null;
 
 	for (const map of Object.values(roomsData.MAPS)) {
@@ -48,15 +56,9 @@ function findDeviceIdByName(devicename) {
 		}
 	}
 	return null;
-}
+};
 
-const credit = { username: process.env.USERNAME, password: process.env.PASSWORD };
-if (!credit.username || !credit.password) {
-	console.error("請在環境變數中設定 USERNAME 和 PASSWORD");
-	process.exit(1);
-}
-
-async function makeRequest(url, formData) {
+const makeRequest = async (url, formData) => {
 	const form = new FormData();
 
 	for (const [key, value] of Object.entries(formData)) {
@@ -79,9 +81,9 @@ async function makeRequest(url, formData) {
 	} catch {
 		throw new Error(`Failed to parse response: ${text.substring(0, 100)}`);
 	}
-}
+};
 
-async function makeRequestWithRetry(url, formData) {
+const makeRequestWithRetry = async (url, formData) => {
 	try {
 		let response = await makeRequest(url, { sid: code.sid, authid: code.authid, ...formData });
 
@@ -127,29 +129,7 @@ async function makeRequestWithRetry(url, formData) {
 		}
 		throw error;
 	}
-}
-
-// Initialize on startup
-(async () => {
-	await fetchRoomsData();
-	console.log("Room data loaded.");
-
-	try {
-		const result = await login(credit);
-		if (result.success) {
-			code = { authid: result.authid, sid: result.sid };
-			console.log("Login successful, cookies obtained.");
-		} else {
-			console.log("Login failed:", result.message);
-		}
-	} catch (err) {
-		console.error("Error during login:", err);
-	}
-})();
-
-fastify.register(Static, {
-	root: path.join(new URL(import.meta.url).pathname, "public")
-});
+};
 
 fastify.get("/api/time", async (req, reply) => {
 	try {
@@ -181,50 +161,39 @@ fastify.get("/api/time", async (req, reply) => {
 fastify.get("/api/room/:id?", async (req, reply) => {
 	try {
 		const { id } = req.params;
-		const today = new Date().toISOString().split("T")[0].replace(/-/g, "/");
-		const endDate = new Date();
-		endDate.setDate(endDate.getDate() + 60);
-		const endDateStr = endDate.toISOString().split("T")[0].replace(/-/g, "/");
+		const { date } = req.query;
+		const target = date ? new Date(date) : new Date();
+		const today = target.toISOString().split("T")[0].replace(/-/g, "/");
 
-		// Fetch rooms data if not already loaded
-		if (!roomsData) {
-			await fetchRoomsData();
-		}
+		if (!roomsData) await fetchRoomsData();
 
-		// Get device IDs to query
-		const deviceIds = id ? [id] : getAllDeviceIds();
-
-		if (deviceIds.length === 0) {
+		if (Object.keys(roomsData).length === 0) {
 			return { success: false, message: "No rooms found" };
 		}
 
-		// Query devices with controlled concurrency to avoid overwhelming the server
 		const BATCH_SIZE = 10;
 		const results = [];
 
-		for (let i = 0; i < deviceIds.length; i += BATCH_SIZE) {
-			const batch = deviceIds.slice(i, i + BATCH_SIZE);
+		for (let i = 0; i < Object.keys(roomsData).length; i += BATCH_SIZE) {
+			const batch = Object.keys(roomsData).slice(i, i + BATCH_SIZE);
 			const batchResults = await Promise.all(
-				batch.map(async deviceId => {
+				batch.map(async devicename => {
 					try {
+						const deviceid = roomsData[devicename];
 						const response = await makeRequestWithRetry("https://studycarrel.lib.nycu.edu.tw/RWDAPISSO/BookTimeSegQuery.aspx", {
 							userid: credit.username,
 							lang: "zh-tw",
 							restype: "json",
 							spacetype: "2",
 							sdate: today,
-							edate: endDateStr,
-							deviceid: deviceId,
+							deviceid,
 							NO_LOADING: "true"
 						});
 
 						if (response[0]?.rescode === "1" && response[0]?.resdata) {
-							const available = response[0].resdata.map(slot => ({ booktime: slot.booktime, bookvalue: slot.bookvalue, canbook: slot.canbook }));
-
-							const devicename = response[0].resdata[0]?.devicename || deviceId;
-
+							const available = Object.fromEntries(response[0].resdata.map(s => [s.booktime, { bookvalue: s.bookvalue, canbook: s.canbook }]));
 							return {
-								deviceid: deviceId,
+								deviceid,
 								devicename,
 								available
 							};
@@ -237,10 +206,6 @@ fastify.get("/api/room/:id?", async (req, reply) => {
 				})
 			);
 			results.push(...batchResults);
-			// Small delay between batches
-			if (i + BATCH_SIZE < deviceIds.length) {
-				await new Promise(resolve => setTimeout(resolve, 100));
-			}
 		}
 
 		// Filter out null results
@@ -277,12 +242,7 @@ fastify.post("/api/reserve", async (req, reply) => {
 			reply.status(400);
 			return { success: false, message: "Invalid request body" };
 		}
-
-		// Fetch rooms data if not already loaded
-		if (!roomsData) {
-			await fetchRoomsData();
-		}
-
+		if (!roomsData) await fetchRoomsData();
 		// Convert devicename to deviceid
 		let deviceid = req.body.deviceid;
 		if (devicename && !deviceid) {
@@ -322,17 +282,17 @@ fastify.post("/api/reserve", async (req, reply) => {
 	}
 });
 
-fastify.post("/api/search", async (req, reply) => {
+fastify.get("/api/search", async (req, reply) => {
 	try {
-		const { id } = req.body;
+		const { id } = req.query;
 
-		if (!id || !Array.isArray(id) || id.length === 0) {
+		if (!id) {
 			reply.status(400);
 			return { success: false, message: "Invalid request body" };
 		}
 
 		const response = await makeRequestWithRetry("https://studycarrel.lib.nycu.edu.tw/RWDAPISSO/BookUserVerify.aspx", {
-			userid: id,
+			userid: [id],
 			lang: "zh-tw",
 			restype: "json",
 			spacetype: "2"
@@ -352,6 +312,19 @@ fastify.post("/api/search", async (req, reply) => {
 	}
 });
 
-fastify.listen({ port: 3000 }, () => {
+try {
+	const result = await login(credit);
+	if (result.success) {
+		code = { authid: result.authid, sid: result.sid };
+		console.log("Login successful, cookies obtained.");
+	} else {
+		console.log("Login failed:", result.message);
+	}
+	await fastify.listen({ port: 3000 });
 	console.log("Server running at http://localhost:3000");
-});
+	await fetchRoomsData();
+	console.log("Room data loaded.");
+} catch (err) {
+	console.error("Failed to start server:", err);
+	process.exit(1);
+}
