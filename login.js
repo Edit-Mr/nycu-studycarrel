@@ -27,7 +27,7 @@ const login = async credit => {
 	for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
 		console.log(`\n嘗試登入 (第 ${attempt} 次)...`);
 		await page.goto(
-			"https://idm.nnycu.ust.edu.tw/sso/886UST_NYCU/oidc/login/?next=/openid/886UST_NYCU/authorize/%3Fclient_id%3D207849%26response_type%3Dcode%26redirect_uri%3Dhttps%3A//studycarrel.lib.nycu.edu.tw/openidcallback.aspx%26state%3Dpwaportal%26scope%3Dopenid",
+			"https://idm.nycu.ust.edu.tw/sso/886UST_NYCU/oidc/login/?next=/openid/886UST_NYCU/authorize/%3Fclient_id%3D207849%26response_type%3Dcode%26redirect_uri%3Dhttps%3A//studycarrel.lib.nycu.edu.tw/openidcallback.aspx%26state%3Dpwaportal%26scope%3Dopenid",
 			{
 				waitUntil: "networkidle2"
 			}
