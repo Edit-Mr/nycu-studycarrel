@@ -290,8 +290,13 @@ fastify.get("/api/search", async (req, reply) => {
 	}
 });
 
+fastify.get("/api/status", async (req, reply) => {
+	return { loggingIn: isLoggingIn };
+});
+
+fastify.listen({ port: process.env.PORT || 3000 });
+
 try {
-	fastify.listen({ port: process.env.PORT || 3000 });
 	const result = await login(credit);
 	if (result.success) {
 		code = { authid: result.authid, sid: result.sid };
