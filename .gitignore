@@ -29,7 +29,7 @@ uv.lock
 # PyTorch / ONNX Training Artifacts
 # ----------------------
 *.pt
-*.onnx.data
+# *.onnx.data
 *.onnx.temp
 *.onnx.tmp
 *.onnx.pb
