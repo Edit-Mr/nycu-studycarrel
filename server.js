@@ -4,7 +4,7 @@ import Static from "@fastify/static";
 import { fileURLToPath } from "url";
 import login from "./login.js";
 
-const fastify = Fastify({ logger: true, level: "error" });
+const fastify = Fastify({ logger: { level: "debug" } });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,7 +14,7 @@ fastify.register(Static, {
 });
 
 let code = {};
-let roomsData = null;
+let roomsData = {};
 let isLoggingIn = false;
 
 const credit = { username: process.env.USERNAME, password: process.env.PASSWORD };
@@ -24,7 +24,6 @@ if (!credit.username || !credit.password) {
 }
 
 const fetchRoomsData = async () => {
-	if (roomsData) return;
 	try {
 		const response = await fetch("https://studycarrel.lib.nycu.edu.tw/pwaspace/configs/map.json");
 		let maps = await response.json();
@@ -43,19 +42,6 @@ const fetchRoomsData = async () => {
 		console.error("Failed to fetch rooms data:", error);
 		return null;
 	}
-};
-
-const findDeviceIdByName = devicename => {
-	if (!roomsData) return null;
-
-	for (const map of Object.values(roomsData.MAPS)) {
-		for (const device of map.devices) {
-			if (device.devicename === devicename) {
-				return device.deviceid;
-			}
-		}
-	}
-	return null;
 };
 
 const makeRequest = async (url, formData) => {
@@ -153,8 +139,8 @@ fastify.get("/api/time", async (req, reply) => {
 			return { success: false, message: response[0]?.resmsg || "Unknown error" };
 		}
 	} catch (error) {
-		reply.status(500);
-		return { success: false, message: error.message };
+		console.error(error);
+		reply.code(500).send({ success: false, message: error.message });
 	}
 });
 
@@ -164,8 +150,6 @@ fastify.get("/api/room/:id?", async (req, reply) => {
 		const { date } = req.query;
 		const target = date ? new Date(date) : new Date();
 		const today = target.toISOString().split("T")[0].replace(/-/g, "/");
-
-		if (!roomsData) await fetchRoomsData();
 
 		if (Object.keys(roomsData).length === 0) {
 			return { success: false, message: "No rooms found" };
@@ -229,8 +213,8 @@ fastify.get("/api/room/:id?", async (req, reply) => {
 			};
 		}
 	} catch (error) {
-		reply.status(500);
-		return { success: false, message: error.message };
+		console.error(error);
+		reply.code(500).send({ success: false, message: error.message });
 	}
 });
 
@@ -239,23 +223,18 @@ fastify.post("/api/reserve", async (req, reply) => {
 		const { id, date, range, devicename } = req.body;
 
 		if (!id || !date || !range || !Array.isArray(id) || !Array.isArray(range)) {
-			reply.status(400);
-			return { success: false, message: "Invalid request body" };
+			reply.status(400).send({ success: false, message: "Invalid request body" });
 		}
-		if (!roomsData) await fetchRoomsData();
-		// Convert devicename to deviceid
 		let deviceid = req.body.deviceid;
 		if (devicename && !deviceid) {
-			deviceid = findDeviceIdByName(devicename);
+			deviceid = roomsData[devicename];
 			if (!deviceid) {
-				reply.status(400);
-				return { success: false, message: `Room ${devicename} not found` };
+				reply.status(400).send({ success: false, message: `Room ${devicename} not found` });
 			}
 		}
 
 		if (!deviceid) {
-			reply.status(400);
-			return { success: false, message: "deviceid or devicename is required" };
+			reply.status(400).send({ success: false, message: "deviceid or devicename is required" });
 		}
 
 		const reserveDate = new Date(date).toISOString().split("T")[0].replace(/-/g, "/");
@@ -277,8 +256,8 @@ fastify.post("/api/reserve", async (req, reply) => {
 			return { success: false, message: response[0]?.resmsg || "Reservation failed" };
 		}
 	} catch (error) {
-		reply.status(500);
-		return { success: false, message: error.message };
+		console.error(error);
+		reply.code(500).send({ success: false, message: error.message });
 	}
 });
 
@@ -287,8 +266,7 @@ fastify.get("/api/search", async (req, reply) => {
 		const { id } = req.query;
 
 		if (!id) {
-			reply.status(400);
-			return { success: false, message: "Invalid request body" };
+			reply.status(400).send({ success: false, message: "Invalid request body" });
 		}
 
 		const response = await makeRequestWithRetry("https://studycarrel.lib.nycu.edu.tw/RWDAPISSO/BookUserVerify.aspx", {
@@ -307,8 +285,8 @@ fastify.get("/api/search", async (req, reply) => {
 			return { success: false, message: response[0]?.resmsg || "User not found" };
 		}
 	} catch (error) {
-		reply.status(500);
-		return { success: false, message: error.message };
+		console.error(error);
+		reply.code(500).send({ success: false, message: error.message });
 	}
 });
 
@@ -323,6 +301,7 @@ try {
 	await fastify.listen({ port: 3000 });
 	console.log("Server running at http://localhost:3000");
 	await fetchRoomsData();
+	console.log(roomsData);
 	console.log("Room data loaded.");
 } catch (err) {
 	console.error("Failed to start server:", err);
