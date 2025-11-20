@@ -1,4 +1,4 @@
 {
-	"build_command": "npx puppeteer browsers install chrome && pnpm install",
+	"build_command": "npx puppeteer browsers install chrome && pnpm install --frozen-lockfile --dangerously-allow-all-builds",
   "start_command": "node server.js"
 }
