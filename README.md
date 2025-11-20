@@ -2,7 +2,7 @@
 
 不登入交大圖書館系統的情況下，與你的好友一起開包廂，享受私密的單獨時光。
 
-<https://nyculib.emtech.cc/>
+<https://nyculib.elvismao.com/>
 
 ## 解決痛點
 
