@@ -86,6 +86,7 @@ const login = async credit => {
 				};
 			} else {
 				console.log("❌ cookie 未取得，截圖中");
+				console.log(cookies);
 				await page.screenshot({ path: `login-fail-cookie-${attempt}.png` });
 			}
 		} catch (error) {
