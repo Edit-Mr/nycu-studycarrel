@@ -298,7 +298,7 @@ try {
 	} else {
 		console.log("Login failed:", result.message);
 	}
-	await fastify.listen({ port: 3000 });
+	await fastify.listen({ port: process.env.PORT || 3000 });
 	console.log("Server running at http://localhost:3000");
 	await fetchRoomsData();
 	console.log(roomsData);
