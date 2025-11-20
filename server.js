@@ -291,6 +291,7 @@ fastify.get("/api/search", async (req, reply) => {
 });
 
 try {
+	fastify.listen({ port: process.env.PORT || 3000 });
 	const result = await login(credit);
 	if (result.success) {
 		code = { authid: result.authid, sid: result.sid };
@@ -298,8 +299,7 @@ try {
 	} else {
 		console.log("Login failed:", result.message);
 	}
-	await fastify.listen({ port: process.env.PORT || 3000 });
-	console.log("Server running at http://localhost:3000");
+	console.log("Server running at http://localhost:" + (process.env.PORT || 3000));
 	await fetchRoomsData();
 	console.log(roomsData);
 	console.log("Room data loaded.");
