@@ -1,1 +1,3 @@
-{ "allowedBuilds": { "onnxruntime-node": true, "puppeteer": true } }
+onlyBuiltDependencies:
+  - onnxruntime-node
+  - puppeteer
