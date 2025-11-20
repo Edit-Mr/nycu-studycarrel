@@ -1,0 +1,1 @@
+{ "allowedBuilds": { "onnxruntime-node": true, "puppeteer": true } }
