@@ -17,9 +17,9 @@ let code = {};
 let roomsData = {};
 let isLoggingIn = false;
 
-const credit = { username: process.env.USERNAME, password: process.env.PASSWORD };
+const credit = { username: process.env.NYCU_USERNAME, password: process.env.NYCU_PASSWORD };
 if (!credit.username || !credit.password) {
-	console.error("請在環境變數中設定 USERNAME 和 PASSWORD");
+	console.error("請在環境變數中設定 NYCU_USERNAME 和 NYCU_PASSWORD");
 	process.exit(1);
 }
 

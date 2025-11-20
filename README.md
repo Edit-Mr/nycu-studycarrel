@@ -27,8 +27,8 @@ npx puppeteer browsers install chrome
 設定環境變數 `.env`（可參考 `.env.example`）：
 
 ```
-USERNAME=114000000
-PASSWORD=yourpasswordhere
+NYCU_USERNAME=114000000
+NYCU_PASSWORD=yourpasswordhere
 ```
 
 安裝相依套件並啟動開發伺服器：
