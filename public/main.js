@@ -343,6 +343,16 @@ const combine = slots => {
 	return r;
 };
 
+// Separate booking toggle
+let separateBooking = false;
+const separateBtn = document.getElementById("separate-btn");
+separateBtn.addEventListener("click", e => {
+	e.preventDefault();
+	separateBooking = !separateBooking;
+	separateBtn.textContent = separateBooking ? "分開預約: 開啟" : "分開預約: 關閉";
+	separateBtn.classList.toggle("active", separateBooking);
+});
+
 // Reserve room
 const reserveBtn = document.getElementById("reserve-btn");
 reserveBtn.addEventListener("click", async e => {
@@ -364,22 +374,51 @@ reserveBtn.addEventListener("click", async e => {
 		reserveBtn.disabled = true;
 		reserveBtn.textContent = "處理中...";
 
-		const response = await fetch("/api/reserve", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json"
-			},
-			body: JSON.stringify({
-				id: selectedFriends,
-				date: document.getElementById("date").value,
-				range: selectedSlots.map(slot => slot.bookvalue),
-				devicename: selectedSlots[0].room
-			})
-		});
+		if (separateBooking) {
+			// Send individual POST requests for each time slot in parallel
+			reserveBtn.textContent = `處理中... (0/${selectedSlots.length})`;
+			
+			const requests = selectedSlots.map(slot =>
+				fetch("/api/reserve", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify({
+						id: selectedFriends,
+						date: document.getElementById("date").value,
+						range: [slot.bookvalue],
+						devicename: slot.room
+					})
+				}).then(async response => {
+					if (!response.ok) {
+						const error = await response.text();
+						throw new Error(`時段 ${slot.time} 預約失敗: ${error}`);
+					}
+					return response.json();
+				})
+			);
 
-		if (!response.ok) throw new Error("Reservation failed");
+			const results = await Promise.all(requests);
+		} else {
+			// Send all slots in one POST request
+			const response = await fetch("/api/reserve", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json"
+				},
+				body: JSON.stringify({
+					id: selectedFriends,
+					date: document.getElementById("date").value,
+					range: selectedSlots.map(slot => slot.bookvalue),
+					devicename: selectedSlots[0].room
+				})
+			});
 
-		const result = await response.json();
+			if (!response.ok) throw new Error("Reservation failed");
+
+			const result = await response.json();
+		}
 
 		// Show result
 		document.getElementById("success-time").innerHTML = document.getElementById("confirm-time").innerHTML;
